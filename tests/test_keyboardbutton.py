@@ -26,22 +26,23 @@ from telegram import (
     KeyboardButtonRequestUser,
     WebAppInfo,
 )
+from tests.auxil.slots import mro_slots
 
 
-@pytest.fixture(scope="class")
+@pytest.fixture(scope="module")
 def keyboard_button():
     return KeyboardButton(
-        TestKeyboardButton.text,
-        request_location=TestKeyboardButton.request_location,
-        request_contact=TestKeyboardButton.request_contact,
-        request_poll=TestKeyboardButton.request_poll,
-        web_app=TestKeyboardButton.web_app,
-        request_chat=TestKeyboardButton.request_chat,
-        request_user=TestKeyboardButton.request_user,
+        TestKeyboardButtonBase.text,
+        request_location=TestKeyboardButtonBase.request_location,
+        request_contact=TestKeyboardButtonBase.request_contact,
+        request_poll=TestKeyboardButtonBase.request_poll,
+        web_app=TestKeyboardButtonBase.web_app,
+        request_chat=TestKeyboardButtonBase.request_chat,
+        request_user=TestKeyboardButtonBase.request_user,
     )
 
 
-class TestKeyboardButton:
+class TestKeyboardButtonBase:
     text = "text"
     request_location = True
     request_contact = True
@@ -50,7 +51,9 @@ class TestKeyboardButton:
     request_chat = KeyboardButtonRequestChat(1, True)
     request_user = KeyboardButtonRequestUser(2)
 
-    def test_slot_behaviour(self, keyboard_button, mro_slots):
+
+class TestKeyboardButtonWithoutRequest(TestKeyboardButtonBase):
+    def test_slot_behaviour(self, keyboard_button):
         inst = keyboard_button
         for attr in inst.__slots__:
             assert getattr(inst, attr, "err") != "err", f"got extra slot '{attr}'"

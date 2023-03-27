@@ -58,21 +58,22 @@ from telegram import (
 )
 from telegram.constants import ChatAction, ParseMode
 from telegram.ext import Defaults
+from tests._passport.test_passport import RAW_PASSPORT_DATA
 from tests.auxil.bot_method_checks import (
     check_defaults_handling,
     check_shortcut_call,
     check_shortcut_signature,
 )
-from tests.test_passport import RAW_PASSPORT_DATA
+from tests.auxil.slots import mro_slots
 
 
-@pytest.fixture(scope="class")
+@pytest.fixture(scope="module")
 def message(bot):
     message = Message(
-        message_id=TestMessage.id_,
-        date=TestMessage.date,
-        chat=copy(TestMessage.chat),
-        from_user=copy(TestMessage.from_user),
+        message_id=TestMessageBase.id_,
+        date=TestMessageBase.date,
+        chat=copy(TestMessageBase.chat),
+        from_user=copy(TestMessageBase.from_user),
     )
     message.set_bot(bot)
     message._unfreeze()
@@ -82,7 +83,6 @@ def message(bot):
 
 
 @pytest.fixture(
-    scope="function",
     params=[
         {"forward_from": User(99, "forward_user", False), "forward_date": datetime.utcnow()},
         {
@@ -271,17 +271,17 @@ def message(bot):
 )
 def message_params(bot, request):
     message = Message(
-        message_id=TestMessage.id_,
-        from_user=TestMessage.from_user,
-        date=TestMessage.date,
-        chat=TestMessage.chat,
+        message_id=TestMessageBase.id_,
+        from_user=TestMessageBase.from_user,
+        date=TestMessageBase.date,
+        chat=TestMessageBase.chat,
         **request.param,
     )
     message.set_bot(bot)
     return message
 
 
-class TestMessage:
+class TestMessageBase:
     id_ = 1
     from_user = User(2, "testuser", False)
     date = datetime.utcnow()
@@ -347,6 +347,13 @@ class TestMessage:
         caption_entities=[MessageEntity(**e) for e in test_entities_v2],
     )
 
+
+class TestMessageWithoutRequest(TestMessageBase):
+    def test_slot_behaviour(self, message):
+        for attr in message.__slots__:
+            assert getattr(message, attr, "err") != "err", f"got extra slot '{attr}'"
+        assert len(mro_slots(message)) == len(set(mro_slots(message))), "duplicate slot"
+
     def test_all_possibilities_de_json_and_to_dict(self, bot, message_params):
         new = Message.de_json(message_params.to_dict(), bot)
         assert new.api_kwargs == {}
@@ -358,10 +365,26 @@ class TestMessage:
         for slot in new.__slots__:
             assert not isinstance(new[slot], dict)
 
-    def test_slot_behaviour(self, message, mro_slots):
-        for attr in message.__slots__:
-            assert getattr(message, attr, "err") != "err", f"got extra slot '{attr}'"
-        assert len(mro_slots(message)) == len(set(mro_slots(message))), "duplicate slot"
+    def test_equality(self):
+        id_ = 1
+        a = Message(id_, self.date, self.chat, from_user=self.from_user)
+        b = Message(id_, self.date, self.chat, from_user=self.from_user)
+        c = Message(id_, self.date, Chat(123, Chat.GROUP), from_user=User(0, "", False))
+        d = Message(0, self.date, self.chat, from_user=self.from_user)
+        e = Update(id_)
+
+        assert a == b
+        assert hash(a) == hash(b)
+        assert a is not b
+
+        assert a != c
+        assert hash(a) != hash(c)
+
+        assert a != d
+        assert hash(a) != hash(d)
+
+        assert a != e
+        assert hash(a) != hash(e)
 
     async def test_parse_entity(self):
         text = (
@@ -500,19 +523,19 @@ class TestMessage:
             MessageEntity(MessageEntity.BOLD, offset=0, length=4),
             MessageEntity(MessageEntity.ITALIC, offset=0, length=4),
         ]
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match="Nested entities are not supported for"):
             assert message.text_markdown
 
         message.entities = [MessageEntity(MessageEntity.UNDERLINE, offset=0, length=4)]
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match="Underline entities are not supported for"):
             message.text_markdown
 
         message.entities = [MessageEntity(MessageEntity.STRIKETHROUGH, offset=0, length=4)]
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match="Strikethrough entities are not supported for"):
             message.text_markdown
 
         message.entities = [MessageEntity(MessageEntity.SPOILER, offset=0, length=4)]
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match="Spoiler entities are not supported for"):
             message.text_markdown
 
         message.entities = []
@@ -563,7 +586,7 @@ class TestMessage:
         expected = b"\\U0001f469\\u200d\\U0001f469\\u200d *ABC*".decode("unicode-escape")
         bold_entity = MessageEntity(type=MessageEntity.BOLD, offset=7, length=3)
         message = Message(
-            1, self.from_user, self.date, self.chat, text=text, entities=[bold_entity]
+            1, self.date, self.chat, self.from_user, text=text, entities=[bold_entity]
         )
         assert expected == message.text_markdown
 
@@ -759,7 +782,7 @@ class TestMessage:
         assert message.link == f"https://t.me/{message.chat.username}/{message.message_id}"
 
     @pytest.mark.parametrize(
-        "type_, id_", argvalues=[(Chat.CHANNEL, -1003), (Chat.SUPERGROUP, -1003)]
+        ("type_", "id_"), argvalues=[(Chat.CHANNEL, -1003), (Chat.SUPERGROUP, -1003)]
     )
     def test_link_with_id(self, message, type_, id_):
         message.chat.username = None
@@ -768,7 +791,7 @@ class TestMessage:
         # The leading - for group ids/ -100 for supergroup ids isn't supposed to be in the link
         assert message.link == f"https://t.me/c/{3}/{message.message_id}"
 
-    @pytest.mark.parametrize("id_, username", argvalues=[(None, "username"), (-3, None)])
+    @pytest.mark.parametrize(("id_", "username"), argvalues=[(None, "username"), (-3, None)])
     def test_link_private_chats(self, message, id_, username):
         message.chat.type = Chat.PRIVATE
         message.chat.id = id_
@@ -1300,7 +1323,7 @@ class TestMessage:
             quote=True,
         )
 
-    @pytest.mark.parametrize("disable_notification,protected", [(False, True), (True, False)])
+    @pytest.mark.parametrize(("disable_notification", "protected"), [(False, True), (True, False)])
     async def test_forward(self, monkeypatch, message, disable_notification, protected):
         async def make_assertion(*_, **kwargs):
             chat_id = kwargs["chat_id"] == 123456
@@ -1322,7 +1345,7 @@ class TestMessage:
         )
         assert not await message.forward(635241)
 
-    @pytest.mark.parametrize("disable_notification,protected", [(True, False), (False, True)])
+    @pytest.mark.parametrize(("disable_notification", "protected"), [(True, False), (False, True)])
     async def test_copy(self, monkeypatch, message, disable_notification, protected):
         keyboard = [[1, 2]]
 
@@ -1363,7 +1386,7 @@ class TestMessage:
         )
         assert not await message.copy(635241)
 
-    @pytest.mark.parametrize("disable_notification,protected", [(True, False), (False, True)])
+    @pytest.mark.parametrize(("disable_notification", "protected"), [(True, False), (False, True)])
     async def test_reply_copy(self, monkeypatch, message, disable_notification, protected):
         keyboard = [[1, 2]]
 
@@ -1826,34 +1849,3 @@ class TestMessage:
 
         monkeypatch.setattr(message.get_bot(), "unpin_all_forum_topic_messages", make_assertion)
         assert await message.unpin_all_forum_topic_messages()
-
-    def test_equality(self):
-        id_ = 1
-        a = Message(
-            id_,
-            self.date,
-            self.chat,
-            from_user=self.from_user,
-        )
-        b = Message(
-            id_,
-            self.date,
-            self.chat,
-            from_user=self.from_user,
-        )
-        c = Message(id_, self.date, Chat(123, Chat.GROUP), from_user=User(0, "", False))
-        d = Message(0, self.date, self.chat, from_user=self.from_user)
-        e = Update(id_)
-
-        assert a == b
-        assert hash(a) == hash(b)
-        assert a is not b
-
-        assert a != c
-        assert hash(a) != hash(c)
-
-        assert a != d
-        assert hash(a) != hash(d)
-
-        assert a != e
-        assert hash(a) != hash(e)

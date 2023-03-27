@@ -84,34 +84,12 @@ Here's how to make a one-off code change.
 
    -  In addition, PTB uses some formatting/styling and linting tools in the pre-commit setup. Some of those tools also have command line tools that can help to run these tools outside of the pre-commit step. If you'd like to leverage that, please have a look at the `pre-commit config file`_ for an overview of which tools (and which versions of them) are used. For example, we use `Black`_ for code formatting. Plugins for Black exist for some `popular editors`_. You can use those instead of manually formatting everything.
 
-   - Please ensure that the code you write is well-tested.
+   - Please ensure that the code you write is well-tested and that all automated tests still pass. We
+     have dedicated an `testing page`_ to help you with that.
 
-        - In addition to that, we provide the `dev` marker for pytest. If you write one or multiple tests and want to run only those, you can decorate them via `@pytest.mark.dev` and then run it with minimal overhead with `pytest ./path/to/test_file.py -m dev`.
-
-   - Don’t break backward compatibility.
+   - Don't break backward compatibility.
 
    - Add yourself to the AUTHORS.rst_ file in an alphabetical fashion.
-
-   - Before making a commit ensure that all automated tests still pass:
-
-     .. code-block:: bash
-
-        $ pytest -v
-
-     Since the tests can take a while to run, you can speed things up by running them in parallel
-     using `pytest-xdist`_ (note that this may effect the result of the test in some rare cases):
-
-     .. code-block:: bash
-
-        $ pytest -v -n auto --dist=loadfile
-
-     To run ``test_official`` (particularly useful if you made API changes), run
-
-     .. code-block:: bash
-
-        $ export TEST_OFFICIAL=true
-
-     prior to running the tests.
 
    - If you want run style & type checks before committing run
 
@@ -205,7 +183,7 @@ or, if you don't have ``make`` available (e.g. on Windows):
 
 Once the process terminates, you can view the built documentation by opening ``docs/build/html/index.html`` with a browser.
 
-- Add ``.. versionadded:: version``, ``.. versionchanged:: version`` or ``.. deprecated:: version`` to the associated documentation of your changes, depending on what kind of change you made. This only applies if the change you made is visible to an end user. The directives should be added to class/method descriptions if their general behaviour changed and to the description of all arguments & attributes that changed.
+- Add ``.. versionadded:: NEXT.VERSION``, ``.. versionchanged:: NEXT.VERSION`` or ``.. deprecated:: NEXT.VERSION`` to the associated documentation of your changes, depending on what kind of change you made. This only applies if the change you made is visible to an end user. The directives should be added to class/method descriptions if their general behaviour changed and to the description of all arguments & attributes that changed.
 
 Dev facing documentation
 ------------------------
@@ -287,4 +265,4 @@ break the API classes. For example:
 .. _`RTD build`: https://docs.python-telegram-bot.org/en/doc-fixes
 .. _`CSI`: https://standards.mousepawmedia.com/en/stable/csi.html
 .. _`section`: #documenting
-.. _`pytest-xdist`: https://github.com/pytest-dev/pytest-xdist
+.. _`testing page`: https://github.com/python-telegram-bot/python-telegram-bot/blob/master/tests/README.rst

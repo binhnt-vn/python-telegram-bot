@@ -34,6 +34,7 @@ from telegram import (
     User,
 )
 from telegram.ext import CallbackContext, JobQueue, PollHandler
+from tests.auxil.slots import mro_slots
 
 message = Message(1, None, Chat(1, ""), from_user=User(1, "", False), text="Text")
 
@@ -67,7 +68,7 @@ def false_update(request):
     return Update(update_id=2, **request.param)
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture()
 def poll(bot):
     return Update(
         0,
@@ -87,14 +88,14 @@ def poll(bot):
 class TestPollHandler:
     test_flag = False
 
-    def test_slot_behaviour(self, mro_slots):
+    def test_slot_behaviour(self):
         inst = PollHandler(self.callback)
         for attr in inst.__slots__:
             assert getattr(inst, attr, "err") != "err", f"got extra slot '{attr}'"
         assert len(mro_slots(inst)) == len(set(mro_slots(inst))), "duplicate slot"
 
     @pytest.fixture(autouse=True)
-    def reset(self):
+    def _reset(self):
         self.test_flag = False
 
     async def callback(self, update, context):

@@ -20,9 +20,10 @@
 import pytest
 
 from telegram import ChatPermissions, User
+from tests.auxil.slots import mro_slots
 
 
-@pytest.fixture(scope="class")
+@pytest.fixture(scope="module")
 def chat_permissions():
     return ChatPermissions(
         can_send_messages=True,
@@ -43,7 +44,7 @@ def chat_permissions():
     )
 
 
-class TestChatPermissions:
+class TestChatPermissionsBase:
     can_send_messages = True
     can_send_media_messages = True
     can_send_polls = True
@@ -60,7 +61,9 @@ class TestChatPermissions:
     can_send_video_notes = False
     can_send_voice_notes = None
 
-    def test_slot_behaviour(self, chat_permissions, mro_slots):
+
+class TestChatPermissionsWithoutRequest(TestChatPermissionsBase):
+    def test_slot_behaviour(self, chat_permissions):
         inst = chat_permissions
         for attr in inst.__slots__:
             assert getattr(inst, attr, "err") != "err", f"got extra slot '{attr}'"

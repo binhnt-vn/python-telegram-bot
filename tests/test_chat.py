@@ -27,39 +27,40 @@ from tests.auxil.bot_method_checks import (
     check_shortcut_call,
     check_shortcut_signature,
 )
+from tests.auxil.slots import mro_slots
 
 
-@pytest.fixture(scope="class")
+@pytest.fixture(scope="module")
 def chat(bot):
     chat = Chat(
-        TestChat.id_,
-        title=TestChat.title,
-        type=TestChat.type_,
-        username=TestChat.username,
-        sticker_set_name=TestChat.sticker_set_name,
-        can_set_sticker_set=TestChat.can_set_sticker_set,
-        permissions=TestChat.permissions,
-        slow_mode_delay=TestChat.slow_mode_delay,
-        bio=TestChat.bio,
-        linked_chat_id=TestChat.linked_chat_id,
-        location=TestChat.location,
+        TestChatBase.id_,
+        title=TestChatBase.title,
+        type=TestChatBase.type_,
+        username=TestChatBase.username,
+        sticker_set_name=TestChatBase.sticker_set_name,
+        can_set_sticker_set=TestChatBase.can_set_sticker_set,
+        permissions=TestChatBase.permissions,
+        slow_mode_delay=TestChatBase.slow_mode_delay,
+        bio=TestChatBase.bio,
+        linked_chat_id=TestChatBase.linked_chat_id,
+        location=TestChatBase.location,
         has_private_forwards=True,
         has_protected_content=True,
         join_to_send_messages=True,
         join_by_request=True,
         has_restricted_voice_and_video_messages=True,
         is_forum=True,
-        active_usernames=TestChat.active_usernames,
-        emoji_status_custom_emoji_id=TestChat.emoji_status_custom_emoji_id,
-        has_aggressive_anti_spam_enabled=TestChat.has_aggressive_anti_spam_enabled,
-        has_hidden_members=TestChat.has_hidden_members,
+        active_usernames=TestChatBase.active_usernames,
+        emoji_status_custom_emoji_id=TestChatBase.emoji_status_custom_emoji_id,
+        has_aggressive_anti_spam_enabled=TestChatBase.has_aggressive_anti_spam_enabled,
+        has_hidden_members=TestChatBase.has_hidden_members,
     )
     chat.set_bot(bot)
     chat._unfreeze()
     return chat
 
 
-class TestChat:
+class TestChatBase:
     id_ = -28767330
     title = "ToledosPalaceBot - Group"
     type_ = "group"
@@ -87,7 +88,9 @@ class TestChat:
     has_aggressive_anti_spam_enabled = True
     has_hidden_members = True
 
-    def test_slot_behaviour(self, chat, mro_slots):
+
+class TestChatWithoutRequest(TestChatBase):
+    def test_slot_behaviour(self, chat):
         for attr in chat.__slots__:
             assert getattr(chat, attr, "err") != "err", f"got extra slot '{attr}'"
         assert len(mro_slots(chat)) == len(set(mro_slots(chat))), "duplicate slot"
@@ -194,6 +197,26 @@ class TestChat:
         chat = Chat(id=1, type="private")
         assert chat.type is ChatType.PRIVATE
 
+    def test_equality(self):
+        a = Chat(self.id_, self.title, self.type_)
+        b = Chat(self.id_, self.title, self.type_)
+        c = Chat(self.id_, "", "")
+        d = Chat(0, self.title, self.type_)
+        e = User(self.id_, "", False)
+
+        assert a == b
+        assert hash(a) == hash(b)
+        assert a is not b
+
+        assert a == c
+        assert hash(a) == hash(c)
+
+        assert a != d
+        assert hash(a) != hash(d)
+
+        assert a != e
+        assert hash(a) != hash(e)
+
     def test_link(self, chat):
         assert chat.link == f"https://t.me/{chat.username}"
         chat.username = None
@@ -233,7 +256,6 @@ class TestChat:
         assert await check_defaults_handling(chat.send_action, chat.get_bot())
 
         monkeypatch.setattr(chat.get_bot(), "send_chat_action", make_assertion)
-        assert await chat.send_action(action=ChatAction.TYPING)
         assert await chat.send_action(action=ChatAction.TYPING)
 
     async def test_leave(self, monkeypatch, chat):
@@ -464,8 +486,7 @@ class TestChat:
 
     async def test_delete_photo(self, monkeypatch, chat):
         async def make_assertion(*_, **kwargs):
-            chat_id = kwargs["chat_id"] == chat.id
-            return chat_id
+            return kwargs["chat_id"] == chat.id
 
         assert check_shortcut_signature(Chat.delete_photo, Bot.delete_chat_photo, ["chat_id"], [])
         assert await check_shortcut_call(chat.delete_photo, chat.get_bot(), "delete_chat_photo")
@@ -1160,8 +1181,8 @@ class TestChat:
         assert await chat.unhide_general_forum_topic()
 
     def test_mention_html(self):
+        chat = Chat(id=1, type="foo")
         with pytest.raises(TypeError, match="Can not create a mention to a private group chat"):
-            chat = Chat(id=1, type="foo")
             chat.mention_html()
 
         expected = '<a href="tg://user?id={}">{}</a>'
@@ -1170,10 +1191,10 @@ class TestChat:
         )
         assert chat.mention_html("the_name*\u2022") == expected.format(chat.id, "the_name*\u2022")
         assert chat.mention_html() == expected.format(chat.id, chat.full_name)
+        chat = Chat(id=1, type=Chat.PRIVATE, last_name="last\u2022name")
         with pytest.raises(
             TypeError, match="Can not create a mention to a private chat without first name"
         ):
-            chat = Chat(id=1, type=Chat.PRIVATE, last_name="last\u2022name")
             chat.mention_html()
 
         expected = '<a href="https://t.me/{}">{}</a>'
@@ -1182,15 +1203,15 @@ class TestChat:
             chat.username, "the_name*\u2022"
         )
         assert chat.mention_html() == expected.format(chat.username, chat.title)
+        chat = Chat(id=1, type="foo", username="user\u2022name")
         with pytest.raises(
             TypeError, match="Can not create a mention to a public chat without title"
         ):
-            chat = Chat(id=1, type="foo", username="user\u2022name")
             chat.mention_html()
 
     def test_mention_markdown(self):
+        chat = Chat(id=1, type="foo")
         with pytest.raises(TypeError, match="Can not create a mention to a private group chat"):
-            chat = Chat(id=1, type="foo")
             chat.mention_markdown()
 
         expected = "[{}](tg://user?id={})"
@@ -1201,10 +1222,10 @@ class TestChat:
             "the_name*\u2022", chat.id
         )
         assert chat.mention_markdown() == expected.format(chat.full_name, chat.id)
+        chat = Chat(id=1, type=Chat.PRIVATE, last_name="last\u2022name")
         with pytest.raises(
             TypeError, match="Can not create a mention to a private chat without first name"
         ):
-            chat = Chat(id=1, type=Chat.PRIVATE, last_name="last\u2022name")
             chat.mention_markdown()
 
         expected = "[{}](https://t.me/{})"
@@ -1213,15 +1234,15 @@ class TestChat:
             "the_name*\u2022", chat.username
         )
         assert chat.mention_markdown() == expected.format(chat.title, chat.username)
+        chat = Chat(id=1, type="foo", username="user\u2022name")
         with pytest.raises(
             TypeError, match="Can not create a mention to a public chat without title"
         ):
-            chat = Chat(id=1, type="foo", username="user\u2022name")
             chat.mention_markdown()
 
     def test_mention_markdown_v2(self):
+        chat = Chat(id=1, type="foo")
         with pytest.raises(TypeError, match="Can not create a mention to a private group chat"):
-            chat = Chat(id=1, type="foo")
             chat.mention_markdown_v2()
 
         expected = "[{}](tg://user?id={})"
@@ -1232,10 +1253,10 @@ class TestChat:
         assert chat.mention_markdown_v2() == expected.format(
             escape_markdown(chat.full_name, version=2), chat.id
         )
+        chat = Chat(id=1, type=Chat.PRIVATE, last_name="last_name")
         with pytest.raises(
             TypeError, match="Can not create a mention to a private chat without first name"
         ):
-            chat = Chat(id=1, type=Chat.PRIVATE, last_name="last_name")
             chat.mention_markdown_v2()
 
         expected = "[{}](https://t.me/{})"
@@ -1246,28 +1267,8 @@ class TestChat:
         assert chat.mention_markdown_v2() == expected.format(
             escape_markdown(chat.title, version=2), chat.username
         )
+        chat = Chat(id=1, type="foo", username="user\u2022name")
         with pytest.raises(
             TypeError, match="Can not create a mention to a public chat without title"
         ):
-            chat = Chat(id=1, type="foo", username="user\u2022name")
             chat.mention_markdown_v2()
-
-    def test_equality(self):
-        a = Chat(self.id_, self.title, self.type_)
-        b = Chat(self.id_, self.title, self.type_)
-        c = Chat(self.id_, "", "")
-        d = Chat(0, self.title, self.type_)
-        e = User(self.id_, "", False)
-
-        assert a == b
-        assert hash(a) == hash(b)
-        assert a is not b
-
-        assert a == c
-        assert hash(a) == hash(c)
-
-        assert a != d
-        assert hash(a) != hash(d)
-
-        assert a != e
-        assert hash(a) != hash(e)
