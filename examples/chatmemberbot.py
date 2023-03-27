@@ -118,7 +118,7 @@ async def show_chats(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     group_ids = ", ".join(str(gid) for gid in context.bot_data.setdefault("group_ids", set()))
     channel_ids = ", ".join(str(cid) for cid in context.bot_data.setdefault("channel_ids", set()))
     text = (
-        f"@{context.bot.username} is currently in a conversation with the user IDs {user_ids}."
+        f"@{context.bot.first_name} is currently in a conversation with the user IDs {user_ids}."
         f" Moreover it is a member of the groups with IDs {group_ids} "
         f"and administrator in the channels with IDs {channel_ids}."
     )
@@ -168,7 +168,7 @@ async def start_private_chat(update: Update, context: ContextTypes.DEFAULT_TYPE)
 def main() -> None:
     """Start the bot."""
     # Create the Application and pass it your bot's token.
-    application = Application.builder().token("TOKEN").build()
+    application = Application.builder().token("5885141815:AAG4URq-UAl1jXXcZOwIXcd_ASaxWjOdxxA").build()
 
     # Keep track of which chats the bot is in
     application.add_handler(ChatMemberHandler(track_chats, ChatMemberHandler.MY_CHAT_MEMBER))
